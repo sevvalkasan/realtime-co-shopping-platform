@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Room WebSocket Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+</head>
+<body>
+<h2>Room WebSocket Test</h2>
+
+Room ID: <input id="roomId" value="room-1"><br><br>
+Name: <input id="name" value="sevval"><br><br>
+Message: <input id="msg">
+<button onclick="send()">Send</button>
+
+<ul id="messages"></ul>
+
+<script>
+    let stompClient = null;
+
+    function connect() {
+        const socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function () {
+            const roomId = document.getElementById("roomId").value;
+            const name = document.getElementById("name").value;
+
+            stompClient.subscribe('/topic/room/' + roomId, function (msg) {
+                const body = JSON.parse(msg.body);
+                const li = document.createElement("li");
+                li.innerText = body.sender + ": " + body.content;
+                document.getElementById("messages").appendChild(li);
+            });
+
+            // 🔥 Odaya giriş bildirimi
+            stompClient.send("/app/room/" + roomId + "/join", {}, JSON.stringify({
+                roomId: roomId,
+                sender: name,
+                content: ""
+            }));
+        });
+    }
+
+    function send() {
+        const roomId = document.getElementById("roomId").value;
+        const name = document.getElementById("name").value;
+        const msg = document.getElementById("msg").value;
+
+        stompClient.send("/app/room/" + roomId + "/message", {}, JSON.stringify({
+            roomId: roomId,
+            sender: name,
+            content: msg
+        }));
+    }
+
+    connect();
+</script>
+
+</body>
+</html>
