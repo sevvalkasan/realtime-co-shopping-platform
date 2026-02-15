@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Shared Cart WebSocket Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+</head>
+<body>
+<h2>Shared Cart Test</h2>
+
+Room ID: <input id="roomId" value="room-1"><br><br>
+Name: <input id="name" value="sevval"><br><br>
+
+<button onclick="addToCart()">Ürünü Sepete Ekle</button>
+
+<h3>Canlı Sepet</h3>
+<ul id="cart"></ul>
+
+<h3>Toplam Tutar: <span id="total">0</span> ₺</h3>
+
+<script>
+    let stompClient = null;
+
+    function connect() {
+        const socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function () {
+            const roomId = document.getElementById("roomId").value;
+
+            stompClient.subscribe('/topic/room/' + roomId + '/cart', function (msg) {
+                const response = JSON.parse(msg.body);
+
+                const cart = response.items;
+                const total = response.total;
+
+                const ul = document.getElementById("cart");
+                ul.innerHTML = "";
+
+cart.forEach(item => {
+    const li = document.createElement("li");
+
+    const users = Object.keys(item.userQuantities)
+        .map(user => user + " (" + item.userQuantities[user] + ")")
+        .join(", ");
+
+    const textSpan = document.createElement("span");
+    textSpan.innerText =
+        item.product.title +
+        " | adet: " + item.quantity +
+        " | ekleyenler: " + users +
+        " | son ekleyen: " + item.lastAddedBy;
+
+    const decreaseBtn = document.createElement("button");
+    decreaseBtn.innerText = "➖";
+    decreaseBtn.style.marginLeft = "10px";
+
+    decreaseBtn.onclick = function () {
+        decreaseItem(item.product.id);
+    };
+
+    li.appendChild(textSpan);
+    li.appendChild(decreaseBtn);
+    ul.appendChild(li);
+});
+
+
+                document.getElementById("total").innerText = total.toFixed(2);
+            });
+        });
+    }
+
+    function addToCart() {
+        const roomId = document.getElementById("roomId").value;
+        const name = document.getElementById("name").value;
+
+        const payload = {
+            product: {
+                id: 1,
+                title: "Mens Casual Premium Slim Fit T-Shirts",
+                image: "https://fakestoreapi.com/img/71-3HjGNDUL._AC_SY879_.jpg",
+                price: 22.3,
+                category: "men's clothing"
+            },
+            addedBy: name
+        };
+
+        stompClient.send("/app/room/" + roomId + "/cart/add", {}, JSON.stringify(payload));
+    }
+    function decreaseItem(productId) {
+    const roomId = document.getElementById("roomId").value;
+    const name = document.getElementById("name").value;
+
+    const payload = {
+        productId: productId,
+        user: name
+    };
+
+    stompClient.send(
+        "/app/room/" + roomId + "/cart/decrease",
+        {},
+        JSON.stringify(payload)
+    );
+}
+
+
+    connect();
+</script>
+</body>
+</html>
