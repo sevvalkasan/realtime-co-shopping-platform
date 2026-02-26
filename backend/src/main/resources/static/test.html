@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+</head>
+<body>
+
+<h2>Room Chat</h2>
+
+<label>Room ID:</label>
+<input type="text" id="roomId" value="test123" />
+<br/><br/>
+
+<label>Username:</label>
+<input type="text" id="username" value="ahmet" />
+<br/><br/>
+
+<button onclick="connect()">Connect</button>
+<button onclick="disconnect()">Disconnect</button>
+
+<hr/>
+
+<div id="chatArea" style="display:none;">
+    <input type="text" id="messageInput" placeholder="Mesaj yaz..." />
+    <button onclick="sendMessage()">Gönder</button>
+
+    <div id="typing" style="font-style: italic; color: gray; margin-top:10px;"></div>
+
+    <ul id="messages"></ul>
+</div>
+
+<script>
+
+    let stompClient = null;
+    let typingTimeout = null;
+
+    function connect() {
+
+        const roomId = document.getElementById("roomId").value;
+
+        const socket = new SockJS("http://localhost:8080/ws");
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function () {
+
+            console.log("Connected");
+            document.getElementById("chatArea").style.display = "block";
+
+            // Chat subscribe
+            stompClient.subscribe(
+                "/topic/room/" + roomId + "/chat",
+                function (message) {
+                    const msg = JSON.parse(message.body);
+                    showMessage(msg);
+                }
+            );
+
+            // Typing subscribe
+            stompClient.subscribe(
+                "/topic/room/" + roomId + "/typing",
+                function (message) {
+
+                    const msg = JSON.parse(message.body);
+                    const currentUser = document.getElementById("username").value;
+
+                    // kendine typing gösterme
+                    if (msg.sender === currentUser) return;
+
+                    if (msg.type === "TYPING") {
+                        document.getElementById("typing").innerText =
+                            msg.sender + " yazıyor...";
+                    }
+
+                    if (msg.type === "STOP_TYPING") {
+                        document.getElementById("typing").innerText = "";
+                    }
+                }
+            );
+
+            // Input listener
+            const input = document.getElementById("messageInput");
+
+            input.addEventListener("input", () => {
+
+                const username = document.getElementById("username").value;
+                const roomId = document.getElementById("roomId").value;
+
+                stompClient.send("/app/chat.typing", {}, JSON.stringify({
+                    sender: username,
+                    roomId: roomId,
+                    type: "TYPING"
+                }));
+
+                clearTimeout(typingTimeout);
+
+                typingTimeout = setTimeout(() => {
+                    stompClient.send("/app/chat.stopTyping", {}, JSON.stringify({
+                        sender: username,
+                        roomId: roomId,
+                        type: "STOP_TYPING"
+                    }));
+                }, 1000);
+            });
+
+        });
+    }
+
+    function disconnect() {
+        if (stompClient !== null) {
+            stompClient.disconnect();
+        }
+        console.log("Disconnected");
+    }
+
+    function sendMessage() {
+
+        const roomId = document.getElementById("roomId").value;
+        const username = document.getElementById("username").value;
+        const content = document.getElementById("messageInput").value;
+
+        const message = {
+            sender: username,
+            content: content
+        };
+
+        stompClient.send(
+            "/app/chat/" + roomId,
+            {},
+            JSON.stringify(message)
+        );
+
+        document.getElementById("messageInput").value = "";
+
+        // Mesaj gönderince typing temizle
+        document.getElementById("typing").innerText = "";
+    }
+
+    function showMessage(message) {
+        const li = document.createElement("li");
+        li.appendChild(
+            document.createTextNode(
+                message.sender + " : " + message.content
+            )
+        );
+        document.getElementById("messages").appendChild(li);
+    }
+
+</script>
+
+</body>
+</html>
