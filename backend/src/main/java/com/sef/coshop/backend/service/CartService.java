@@ -2,87 +2,80 @@ package com.sef.coshop.backend.service;
 
 import com.sef.coshop.backend.model.CartItem;
 import com.sef.coshop.backend.model.Product;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class CartService {
 
-    private final Map<String, List<CartItem>> roomCarts = new HashMap<>();
+    private final RedisTemplate<String, Object> redisTemplate;
+    private static final String CART_KEY_PREFIX = "cart:";
+
+    // Her oda için benzersiz bir Redis anahtarı oluşturur (örn: cart:room123)
+    private String getCartKey(String roomId) {
+        return CART_KEY_PREFIX + roomId;
+    }
 
     public List<CartItem> getCart(String roomId) {
-        return roomCarts.getOrDefault(roomId, new ArrayList<>());
+        // Odadaki tüm ürünleri Redis Hash'inden çekiyoruz
+        Map<Object, Object> entries = redisTemplate.opsForHash().entries(getCartKey(roomId));
+        return entries.values().stream()
+                .map(obj -> (CartItem) obj)
+                .collect(Collectors.toList());
     }
 
     public List<CartItem> addToCart(String roomId, Product product, String user) {
+        String cartKey = getCartKey(roomId);
+        String productId = String.valueOf(product.getId());
 
-        roomCarts.putIfAbsent(roomId, new ArrayList<>());
-        List<CartItem> cart = roomCarts.get(roomId);
+        // Ürünü Hash içinden çek (Varsa miktar artacak, yoksa yeni eklenecek)
+        CartItem item = (CartItem) redisTemplate.opsForHash().get(cartKey, productId);
 
-        Optional<CartItem> existingItem = cart.stream()
-                .filter(item -> item.getProduct().getId().equals(product.getId()))
-                .findFirst();
-
-        if (existingItem.isPresent()) {
-            existingItem.get().increase(user);
+        if (item != null) {
+            item.increase(user);
         } else {
-            cart.add(new CartItem(product, user));
+            item = new CartItem(product, user);
         }
 
-        return cart;
+        redisTemplate.opsForHash().put(cartKey, productId, item);
+        return getCart(roomId);
     }
 
     public List<CartItem> decreaseItem(String roomId, Long productId, String user) {
+        String cartKey = getCartKey(roomId);
+        String pid = String.valueOf(productId);
 
-        List<CartItem> cart = roomCarts.get(roomId);
-        if (cart == null) return new ArrayList<>();
+        CartItem item = (CartItem) redisTemplate.opsForHash().get(cartKey, pid);
 
-        Iterator<CartItem> iterator = cart.iterator();
-
-        while (iterator.hasNext()) {
-            CartItem item = iterator.next();
-
-            if (item.getProduct().getId().equals(productId)) {
-
-                item.decrease(user);
-
-                if (item.getQuantity() <= 0) {
-                    iterator.remove();
-                }
-
-                break;
+        if (item != null) {
+            item.decrease(user);
+            if (item.getQuantity() <= 0) {
+                redisTemplate.opsForHash().delete(cartKey, pid);
+            } else {
+                redisTemplate.opsForHash().put(cartKey, pid, item);
             }
         }
-
-        return cart;
+        return getCart(roomId);
     }
 
     public List<CartItem> removeItem(String roomId, Long productId) {
-
-        List<CartItem> cart = roomCarts.get(roomId);
-        if (cart == null) return new ArrayList<>();
-
-        cart.removeIf(item ->
-                item.getProduct().getId().equals(productId)
-        );
-
-        return cart;
+        redisTemplate.opsForHash().delete(getCartKey(roomId), String.valueOf(productId));
+        return getCart(roomId);
     }
 
     public void clearCart(String roomId) {
-        roomCarts.remove(roomId);
+        redisTemplate.delete(getCartKey(roomId));
     }
 
     public double calculateTotal(String roomId) {
-
-        List<CartItem> cart = roomCarts.get(roomId);
-        if (cart == null) return 0.0;
-
-        return cart.stream()
-                .mapToDouble(item ->
-                        item.getProduct().getPrice() * item.getQuantity()
-                )
+        return getCart(roomId).stream()
+                .mapToDouble(item -> item.getProduct().getPrice() * item.getQuantity())
                 .sum();
     }
 }
