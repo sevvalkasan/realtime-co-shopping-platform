@@ -2,6 +2,7 @@ package com.sef.coshop.backend.listener;
 
 import com.sef.coshop.backend.service.PresenceService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.listener.ChannelTopic;
@@ -22,6 +23,7 @@ public class PresenceEventListener {
     private PresenceService presenceService;
 
     @Bean
+    @ConditionalOnProperty(name = "app.redis.enabled", havingValue = "true")
     RedisMessageListenerContainer redisContainer(
             RedisConnectionFactory connectionFactory) {
 
