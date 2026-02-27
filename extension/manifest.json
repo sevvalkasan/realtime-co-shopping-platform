@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Coshop Trendyol Bridge",
+  "version": "0.1.0",
+  "description": "Trendyol urunlerini ortak listeye ekler ve arkadaslariniza bildirim gonderir.",
+  "permissions": ["storage", "notifications", "alarms"],
+  "host_permissions": [
+    "https://www.trendyol.com/*",
+    "http://localhost:8080/*",
+    "http://127.0.0.1:8080/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Coshop Ayarlar"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.trendyol.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

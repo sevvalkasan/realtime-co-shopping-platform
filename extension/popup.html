@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coshop Ayarlar</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 14px; width: 320px; background: #f3f4f6; }
+    .card { background: #fff; border-radius: 10px; padding: 12px; border: 1px solid #e5e7eb; }
+    h1 { margin: 0 0 10px; font-size: 14px; }
+    label { display: block; font-size: 12px; font-weight: 700; margin: 8px 0 4px; }
+    input { width: 100%; box-sizing: border-box; padding: 8px; border-radius: 8px; border: 1px solid #d1d5db; }
+    button { margin-top: 12px; width: 100%; padding: 9px; border: 0; border-radius: 8px; background: #111827; color: #fff; font-weight: 700; cursor: pointer; }
+    .status { margin-top: 8px; font-size: 11px; color: #166534; min-height: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Coshop Eklenti Ayarlari</h1>
+
+    <label for="backendUrl">Backend URL</label>
+    <input id="backendUrl" placeholder="http://localhost:8080" />
+
+    <label for="roomId">Oda ID</label>
+    <input id="roomId" placeholder="room-ortak" />
+
+    <label for="username">Kullanici Adi</label>
+    <input id="username" placeholder="sevval" />
+
+    <label for="extensionApiKey">Extension API Key</label>
+    <input id="extensionApiKey" placeholder="APP_EXTENSION_API_KEY degeri" />
+
+    <button id="saveBtn">Kaydet</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

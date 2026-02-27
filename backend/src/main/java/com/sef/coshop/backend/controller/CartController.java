@@ -9,7 +9,6 @@ import com.sef.coshop.backend.service.ProductService;
 import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/rooms/{roomId}/cart")
-@CrossOrigin
 public class CartController {
 
     private final CartService cartService;
