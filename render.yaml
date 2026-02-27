@@ -1,14 +1,11 @@
 services:
   - type: web
     name: coshop-backend
-    env: java
+    env: docker
     rootDir: backend
+    dockerfilePath: ./Dockerfile
     autoDeploy: true
-    buildCommand: ./mvnw clean package -DskipTests
-    startCommand: java -jar target/backend-0.0.1-SNAPSHOT.jar
     envVars:
-      - key: JAVA_VERSION
-        value: "21"
       - key: SPRING_DATASOURCE_URL
         sync: false
       - key: SPRING_DATASOURCE_USERNAME
