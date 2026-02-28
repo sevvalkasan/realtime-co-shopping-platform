@@ -26,6 +26,7 @@ const Dashboard = () => {
   const [cart, setCart] = useState([]);
   const [cartTotal, setCartTotal] = useState(0);
   const [sharedItems, setSharedItems] = useState([]);
+  const [selectedCartItem, setSelectedCartItem] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [notifications, setNotifications] = useState([]);
@@ -297,6 +298,11 @@ const Dashboard = () => {
     }
   };
 
+  const handleSelectCartItem = (item) => {
+    if (!item?.product) return;
+    setSelectedCartItem(item);
+  };
+
   const handleSendChat = () => {
     const content = chatInput.trim();
     if (!content) return;
@@ -370,6 +376,39 @@ const Dashboard = () => {
         {/* Ürün Listesi */}
         <main className="flex-1 overflow-y-auto p-10">
           <div className="max-w-6xl mx-auto">
+            {selectedCartItem?.product && (
+              <div className="mb-8 rounded-3xl border bg-white p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-6">
+                  <div className="flex items-start gap-4">
+                    <img
+                      src={selectedCartItem.product.image}
+                      alt={selectedCartItem.product.title}
+                      className="h-24 w-24 rounded-2xl border object-contain bg-gray-50"
+                    />
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-widest text-blue-600">Canlı Sepet Detayı</p>
+                      <h3 className="mt-1 text-lg font-black text-gray-800">{selectedCartItem.product.title}</h3>
+                      <p className="mt-2 text-sm font-bold text-gray-600">
+                        Fiyat: <span className="text-gray-900">{selectedCartItem.product.price} TL</span>
+                      </p>
+                      <p className="text-sm font-bold text-gray-600">
+                        Adet: <span className="text-gray-900">{selectedCartItem.quantity}</span>
+                      </p>
+                      <p className="text-sm font-bold text-gray-600">
+                        Son ekleyen: <span className="text-gray-900">{selectedCartItem.lastAddedBy ?? selectedCartItem.addedBy ?? "-"}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedCartItem(null)}
+                    className="rounded-lg border px-3 py-1.5 text-xs font-bold text-gray-600 hover:bg-gray-50"
+                  >
+                    Kapat
+                  </button>
+                </div>
+              </div>
+            )}
+
             <h2 className="text-3xl font-black mb-10 text-gray-800">Tekstil Koleksiyonu</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
               {products.map((product) => (
@@ -411,14 +450,21 @@ const Dashboard = () => {
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {cart.length === 0 && <p className="text-gray-400 text-center mt-10 text-sm italic">Sepet henüz boş...</p>}
             {cart.map((item, index) => (
-              <div key={index} className="flex gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+              <div
+                key={index}
+                className="flex cursor-pointer gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100 transition hover:border-blue-200 hover:bg-blue-50/50"
+                onClick={() => handleSelectCartItem(item)}
+              >
                 <img src={item.product.image} className="w-16 h-16 object-contain rounded-lg" alt="" />
                 <div className="flex-1">
                   <h4 className="text-xs font-bold text-gray-800 line-clamp-1">{item.product.title}</h4>
                   <div className="mt-1 flex items-center justify-between">
                     <p className="text-blue-600 font-black text-sm">{item.product.price} TL x {item.quantity}</p>
                     <button
-                      onClick={() => handleDecreaseFromCart(item.product.id)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleDecreaseFromCart(item.product.id);
+                      }}
                       className="w-7 h-7 rounded-lg bg-red-100 text-red-600 font-black hover:bg-red-200 transition"
                       title="Sepetten 1 adet eksilt"
                     >
