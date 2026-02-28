@@ -6,6 +6,7 @@ import com.sef.coshop.backend.repository.UserRepository;
 import com.sef.coshop.backend.security.JwtUtil;
 import com.sef.coshop.backend.service.CodeDeliveryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,6 +25,8 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final CodeDeliveryService codeDeliveryService;
+    @Value("${app.auth.require-verification:false}")
+    private boolean requireVerification;
 
     private String normalizeEmail(String value) {
         return value == null ? "" : value.trim().toLowerCase();
@@ -251,7 +254,7 @@ public class AuthController {
         User user = userRepository.findByUsernameOrEmail(loginInput, loginInput.toLowerCase())
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
 
-        if (!user.isVerified()) {
+        if (requireVerification && !user.isVerified()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("message", "Hesap doğrulanmamış. Lütfen e-posta veya telefon doğrulaması yapın."));
         }
