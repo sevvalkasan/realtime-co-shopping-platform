@@ -55,15 +55,6 @@ public class RoomActivityService {
                 roomUsers.remove(normalizedRoomId);
             }
         }
-
-        Set<String> rooms = userRooms.get(normalizedUser);
-        if (rooms != null) {
-            rooms.remove(normalizedRoomId);
-            if (rooms.isEmpty()) {
-                userRooms.remove(normalizedUser);
-            }
-        }
-
         touchRoom(normalizedRoomId);
     }
 
