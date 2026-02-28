@@ -6,16 +6,26 @@
   };
 
   const getSettings = () =>
-    new Promise((resolve) => {
-      chrome.storage.sync.get(
-        {
-          backendUrl: "http://localhost:8080",
-          roomId: "room-ortak",
-          username: "",
-          extensionApiKey: ""
-        },
-        resolve
-      );
+    new Promise((resolve, reject) => {
+      try {
+        chrome.storage.sync.get(
+          {
+            backendUrl: "https://realtime-co-shopping-platform.onrender.com",
+            roomId: "room-ortak",
+            username: "",
+            extensionApiKey: ""
+          },
+          (result) => {
+            if (chrome.runtime?.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+              return;
+            }
+            resolve(result);
+          }
+        );
+      } catch (error) {
+        reject(error);
+      }
     });
 
   const pickText = (...selectors) => {
@@ -77,7 +87,19 @@
   };
 
   const addToSharedList = async () => {
-    const settings = await getSettings();
+    let settings;
+    try {
+      settings = await getSettings();
+    } catch (error) {
+      const message = (error?.message || "").toLowerCase();
+      if (message.includes("context invalidated")) {
+        showToast("Eklenti guncellendi. Sayfayi yenileyip tekrar deneyin.", false);
+        return;
+      }
+      showToast(`Ayarlar okunamadi: ${error?.message || "Bilinmeyen hata"}`, false);
+      return;
+    }
+
     if (!settings.username?.trim()) {
       showToast("Eklenti ayarlarindan kullanici adini doldurun.", false);
       return;
@@ -116,7 +138,13 @@
       }
 
       showToast("Ortak listeye eklendi.");
-      chrome.runtime.sendMessage({ type: "shared-item-added" });
+      try {
+        chrome.runtime.sendMessage({ type: "shared-item-added" }, () => {
+          void chrome.runtime?.lastError;
+        });
+      } catch (_) {
+        // extension context invalidated olabilir; listeye ekleme zaten başarılı.
+      }
     } catch (error) {
       showToast(`Hata: ${error.message}`, false);
     }
