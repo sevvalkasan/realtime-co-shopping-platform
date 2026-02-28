@@ -2,6 +2,7 @@ package com.sef.coshop.backend.controller;
 
 import com.sef.coshop.backend.model.*;
 import com.sef.coshop.backend.service.CartService;
+import com.sef.coshop.backend.service.RoomActivityService;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
@@ -13,9 +14,11 @@ import java.util.List;
 public class CartWebSocketController {
 
     private final CartService cartService;
+    private final RoomActivityService roomActivityService;
 
-    public CartWebSocketController(CartService cartService) {
+    public CartWebSocketController(CartService cartService, RoomActivityService roomActivityService) {
         this.cartService = cartService;
+        this.roomActivityService = roomActivityService;
     }
 
     @MessageMapping("/room/{roomId}/cart/add")
@@ -28,6 +31,7 @@ public class CartWebSocketController {
                 request.getProduct(),
                 request.getAddedBy()
         );
+        roomActivityService.recordActivity(roomId, request.getAddedBy());
 
         double total = cartService.calculateTotal(roomId);
 
@@ -44,6 +48,7 @@ public class CartWebSocketController {
                 request.getProductId(),
                 request.getUser()
         );
+        roomActivityService.recordActivity(roomId, request.getUser());
 
         double total = cartService.calculateTotal(roomId);
 

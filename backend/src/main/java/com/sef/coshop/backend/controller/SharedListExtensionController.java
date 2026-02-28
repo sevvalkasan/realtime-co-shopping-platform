@@ -7,6 +7,7 @@ import com.sef.coshop.backend.model.CartItem;
 import com.sef.coshop.backend.model.CartResponse;
 import com.sef.coshop.backend.service.SharedListEventService;
 import com.sef.coshop.backend.service.CartService;
+import com.sef.coshop.backend.service.RoomActivityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -28,6 +29,7 @@ public class SharedListExtensionController {
 
     private final SharedListEventService sharedListEventService;
     private final CartService cartService;
+    private final RoomActivityService roomActivityService;
     private final SimpMessagingTemplate messagingTemplate;
     @Value("${app.extension.api-key:}")
     private String extensionApiKey;
@@ -88,6 +90,7 @@ public class SharedListExtensionController {
                 "/topic/room/" + event.getRoomId() + "/cart",
                 new CartResponse(updatedCart, total)
         );
+        roomActivityService.recordActivity(event.getRoomId(), event.getAddedBy());
     }
 
     private long buildSyntheticProductId(SharedListEvent event) {

@@ -7,6 +7,7 @@ import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 import com.sef.coshop.backend.repository.ChatMessageRepository;
+import com.sef.coshop.backend.service.RoomActivityService;
 
 import java.time.LocalDateTime;
 
@@ -16,6 +17,8 @@ public class ChatWebSocketController {
     private ChatMessageRepository chatMessageRepository;
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
+    @Autowired
+    private RoomActivityService roomActivityService;
 
     @MessageMapping("/chat/{roomId}")
     public void sendMessage(@DestinationVariable String roomId,
@@ -24,6 +27,7 @@ public class ChatWebSocketController {
         message.setRoomId(roomId);
         message.setTimestamp(LocalDateTime.now());
         message.setType("MESSAGE");
+        roomActivityService.recordActivity(roomId, message.getSender());
 
         // 🔥 DB'ye kaydet
         chatMessageRepository.save(message);

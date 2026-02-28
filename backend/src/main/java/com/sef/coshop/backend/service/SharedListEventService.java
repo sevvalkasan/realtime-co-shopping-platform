@@ -59,6 +59,11 @@ public class SharedListEventService {
         return result;
     }
 
+    public void clearRoom(String roomId) {
+        if (roomId == null || roomId.isBlank()) return;
+        roomEvents.remove(roomId.trim());
+    }
+
     private String normalize(String value, String fallback) {
         if (value == null) {
             return fallback;

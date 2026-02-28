@@ -1,6 +1,6 @@
 const DEFAULTS = {
   backendUrl: "https://realtime-co-shopping-platform.onrender.com",
-  roomId: "room-ortak",
+  roomId: "",
   username: "",
   extensionApiKey: ""
 };
@@ -27,7 +27,8 @@ const shortText = (value, max = 80) =>
 
 const fetchEventsAndNotify = async () => {
   const settings = await getSync(DEFAULTS);
-  const roomId = settings.roomId || DEFAULTS.roomId;
+  const roomId = (settings.roomId || "").trim();
+  if (!roomId) return;
   const username = (settings.username || "").trim().toLowerCase();
   const lastSeenKey = getLastSeenKey(roomId);
   const lastSeenObj = await getSync({ [lastSeenKey]: 0 });

@@ -56,6 +56,9 @@ public class PresenceService {
     public Set<String> getUsers(String roomId) {
         return redisTemplate.opsForSet().members(getRoomKey(roomId));
     }
+    public void clearRoom(String roomId) {
+        redisTemplate.delete(getRoomKey(roomId));
+    }
     private void refreshTTL(String roomId) {
         redisTemplate.expire(getRoomKey(roomId), Duration.ofHours(1));
     }

@@ -11,6 +11,8 @@
     label { display: block; font-size: 12px; font-weight: 700; margin: 8px 0 4px; }
     input { width: 100%; box-sizing: border-box; padding: 8px; border-radius: 8px; border: 1px solid #d1d5db; }
     button { margin-top: 12px; width: 100%; padding: 9px; border: 0; border-radius: 8px; background: #111827; color: #fff; font-weight: 700; cursor: pointer; }
+    .row { display: flex; gap: 8px; }
+    .row button { margin-top: 0; width: auto; flex: 1; }
     .status { margin-top: 8px; font-size: 11px; color: #166534; min-height: 14px; }
   </style>
 </head>
@@ -19,10 +21,13 @@
     <h1>Coshop Eklenti Ayarlari</h1>
 
     <label for="backendUrl">Backend URL</label>
-    <input id="backendUrl" placeholder="http://localhost:8080" />
+    <input id="backendUrl" placeholder="https://realtime-co-shopping-platform.onrender.com" />
 
     <label for="roomId">Oda ID</label>
-    <input id="roomId" placeholder="room-ortak" />
+    <input id="roomId" placeholder="room-ab12cd34" />
+    <div class="row" style="margin-top: 8px;">
+      <button id="newRoomBtn" type="button">Yeni Oda ID Uret</button>
+    </div>
 
     <label for="username">Kullanici Adi</label>
     <input id="username" placeholder="sevval" />

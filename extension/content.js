@@ -11,7 +11,7 @@
         chrome.storage.sync.get(
           {
             backendUrl: "https://realtime-co-shopping-platform.onrender.com",
-            roomId: "room-ortak",
+            roomId: "",
             username: "",
             extensionApiKey: ""
           },
@@ -106,6 +106,10 @@
     }
     if (!settings.extensionApiKey?.trim()) {
       showToast("Eklenti ayarlarindan Extension API Key girin.", false);
+      return;
+    }
+    if (!settings.roomId?.trim()) {
+      showToast("Eklenti ayarlarindan oda ID girin.", false);
       return;
     }
 

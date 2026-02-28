@@ -21,12 +21,27 @@ const getUsernameFromToken = (token) => {
 const getCartQuantity = (items) =>
   (items || []).reduce((sum, item) => sum + (item?.quantity || 0), 0);
 
+const formatLastActivity = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("tr-TR", { hour12: false });
+};
+
+const generateRoomId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return `room-${crypto.randomUUID().slice(0, 8)}`;
+  }
+  return `room-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 const Dashboard = () => {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [cartTotal, setCartTotal] = useState(0);
   const [sharedItems, setSharedItems] = useState([]);
   const [selectedCartItem, setSelectedCartItem] = useState(null);
+  const [joinedRooms, setJoinedRooms] = useState([]);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [notifications, setNotifications] = useState([]);
@@ -69,6 +84,12 @@ const Dashboard = () => {
     setSharedItems([]);
     setChatMessages([]);
   }, [roomId]);
+
+  useEffect(() => {
+    fetchMyRooms();
+    const intervalId = setInterval(fetchMyRooms, 15000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     if (!roomId) return;
@@ -145,6 +166,15 @@ const Dashboard = () => {
     }
   };
 
+  const fetchMyRooms = async () => {
+    try {
+      const response = await api.get('/api/rooms/mine');
+      setJoinedRooms(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      setJoinedRooms([]);
+    }
+  };
+
   const connectWebSocket = (targetRoomId) => {
     const token = localStorage.getItem("token");
     const socket = new SockJS(`${WS_BASE_URL}/ws`);
@@ -161,6 +191,7 @@ const Dashboard = () => {
           destination: `/app/room/${targetRoomId}/join`,
           body: JSON.stringify({ username: currentUser })
         });
+        fetchMyRooms();
 
         // Sepet Güncellemelerini Dinle
       client.subscribe(`/topic/room/${targetRoomId}/cart`, (message) => {
@@ -222,9 +253,15 @@ const Dashboard = () => {
   };
 
   const createRoom = () => {
-    const newRoomId = `room-${Math.random().toString(36).substr(2, 9)}`;
+    const newRoomId = generateRoomId();
     setRoomId(newRoomId);
     setSearchParams({ roomId: newRoomId });
+  };
+
+  const switchRoom = (nextRoomId) => {
+    if (!nextRoomId) return;
+    setRoomId(nextRoomId);
+    setSearchParams({ roomId: nextRoomId });
   };
 
   const copyInviteLink = () => {
@@ -356,21 +393,56 @@ const Dashboard = () => {
         </div>
 
         <div className="flex items-center gap-4">
+          <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+            <p className="text-[10px] font-bold uppercase text-gray-500">Giriş yapan</p>
+            <p className="text-sm font-black text-gray-800">{currentUser}</p>
+          </div>
           {!roomId ? (
             <button onClick={createRoom} className="bg-blue-600 text-white px-5 py-2 rounded-xl font-bold text-sm hover:bg-blue-700 transition">
               🤝 Birlikte Alışveriş Başlat
             </button>
           ) : (
-            <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-xl border border-blue-100">
-              <span className="text-xs font-bold text-blue-600 uppercase italic">Oda: {roomId}</span>
-              <button onClick={copyInviteLink} className="bg-blue-600 text-white p-1.5 rounded-lg hover:bg-blue-700 transition">🔗</button>
-            </div>
+            <>
+              <button
+                onClick={createRoom}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-indigo-700 transition"
+              >
+                Yeni Oda
+              </button>
+              <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-xl border border-blue-100">
+                <span className="text-xs font-bold text-blue-600 uppercase italic">Oda: {roomId}</span>
+                <button onClick={copyInviteLink} className="bg-blue-600 text-white p-1.5 rounded-lg hover:bg-blue-700 transition">🔗</button>
+              </div>
+            </>
           )}
           <button onClick={() => { localStorage.clear(); navigate('/'); }} className="text-red-500 font-bold text-sm px-4 py-2 hover:bg-red-50 rounded-lg transition">
             Çıkış
           </button>
         </div>
       </nav>
+
+      <div className="border-b bg-white px-8 py-3">
+        <div className="flex items-center gap-2 overflow-x-auto">
+          <span className="text-xs font-black uppercase text-gray-500 whitespace-nowrap">Katıldığım Odalar</span>
+          {joinedRooms.length === 0 && (
+            <span className="text-xs text-gray-400">Henüz oda yok</span>
+          )}
+          {joinedRooms.map((room) => (
+            <button
+              key={room.roomId}
+              onClick={() => switchRoom(room.roomId)}
+              title={`Son hareket: ${formatLastActivity(room.lastActivityAt)} | Üye: ${room.memberCount ?? 0}`}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-bold whitespace-nowrap transition ${
+                room.roomId === roomId
+                  ? "border-blue-200 bg-blue-50 text-blue-700"
+                  : "border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              {room.roomId}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Ürün Listesi */}
