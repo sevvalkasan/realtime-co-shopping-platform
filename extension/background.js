@@ -2,7 +2,8 @@ const DEFAULTS = {
   backendUrl: "https://realtime-co-shopping-platform.onrender.com",
   roomId: "",
   username: "",
-  extensionApiKey: ""
+  extensionApiKey: "",
+  authToken: ""
 };
 
 const getSync = (keys) =>
@@ -35,13 +36,21 @@ const fetchEventsAndNotify = async () => {
   const sinceId = Number(lastSeenObj[lastSeenKey] || 0);
 
   try {
-    if (!settings.extensionApiKey?.trim()) return;
+    const extensionApiKey = (settings.extensionApiKey || "").trim();
+    const authToken = (settings.authToken || "").trim();
+    if (!extensionApiKey && !authToken) return;
+
+    const headers = {};
+    if (extensionApiKey) {
+      headers["X-Extension-Key"] = extensionApiKey;
+    }
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
+    }
 
     const url = `${settings.backendUrl}/api/extension/shared-list/events?roomId=${encodeURIComponent(roomId)}&sinceId=${sinceId}`;
     const response = await fetch(url, {
-      headers: {
-        "X-Extension-Key": settings.extensionApiKey
-      }
+      headers
     });
     if (!response.ok) return;
 

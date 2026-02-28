@@ -21,6 +21,12 @@ const getUsernameFromToken = (token) => {
 const getCartQuantity = (items) =>
   (items || []).reduce((sum, item) => sum + (item?.quantity || 0), 0);
 
+const calculateCartTotal = (items) =>
+  (items || []).reduce(
+    (sum, item) => sum + (Number(item?.product?.price || 0) * Number(item?.quantity || 0)),
+    0
+  );
+
 const formatLastActivity = (value) => {
   if (!value) return "";
   const date = new Date(value);
@@ -41,7 +47,9 @@ const Dashboard = () => {
   const [cartTotal, setCartTotal] = useState(0);
   const [sharedItems, setSharedItems] = useState([]);
   const [selectedCartItem, setSelectedCartItem] = useState(null);
+  const [activeUsers, setActiveUsers] = useState([]);
   const [joinedRooms, setJoinedRooms] = useState([]);
+  const [extensionSyncStatus, setExtensionSyncStatus] = useState('');
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [notifications, setNotifications] = useState([]);
@@ -49,6 +57,7 @@ const Dashboard = () => {
   const [chatPosition, setChatPosition] = useState({ x: 24, y: 120 });
   const [loading, setLoading] = useState(true);
   const [stompClient, setStompClient] = useState(null);
+  const extensionSyncTimeoutRef = useRef(null);
   const chatDragRef = useRef({ active: false, offsetX: 0, offsetY: 0 });
   const previousCartRef = useRef([]);
   const sharedLastSeenRef = useRef(0);
@@ -72,7 +81,12 @@ const Dashboard = () => {
       cartFeedReadyRef.current = false;
       previousCartRef.current = [];
       sharedLastSeenRef.current = 0;
+      setCart([]);
+      setCartTotal(0);
+      setActiveUsers([]);
+      setSelectedCartItem(null);
       setSharedItems([]);
+      fetchRoomCart(roomId);
       fetchChatHistory(roomId);
       fetchSharedList(roomId, true);
       const client = connectWebSocket(roomId);
@@ -81,6 +95,10 @@ const Dashboard = () => {
     previousCartRef.current = [];
     cartFeedReadyRef.current = false;
     sharedLastSeenRef.current = 0;
+    setCart([]);
+    setCartTotal(0);
+    setActiveUsers([]);
+    setSelectedCartItem(null);
     setSharedItems([]);
     setChatMessages([]);
   }, [roomId]);
@@ -90,6 +108,11 @@ const Dashboard = () => {
     const intervalId = setInterval(fetchMyRooms, 15000);
     return () => clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    if (!roomId) return;
+    syncSettingsToExtension(true);
+  }, [roomId, currentUser]);
 
   useEffect(() => {
     if (!roomId) return;
@@ -105,6 +128,9 @@ const Dashboard = () => {
     return () => {
       notificationTimersRef.current.forEach((timerId) => clearTimeout(timerId));
       notificationTimersRef.current.clear();
+      if (extensionSyncTimeoutRef.current) {
+        clearTimeout(extensionSyncTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -175,6 +201,21 @@ const Dashboard = () => {
     }
   };
 
+  const fetchRoomCart = async (targetRoomId) => {
+    if (!targetRoomId) return;
+    try {
+      const response = await api.get(`/api/rooms/${targetRoomId}/cart`);
+      const roomCart = Array.isArray(response.data) ? response.data : [];
+      setCart(roomCart);
+      setCartTotal(calculateCartTotal(roomCart));
+      previousCartRef.current = roomCart;
+      cartFeedReadyRef.current = true;
+    } catch (error) {
+      setCart([]);
+      setCartTotal(0);
+    }
+  };
+
   const connectWebSocket = (targetRoomId) => {
     const token = localStorage.getItem("token");
     const socket = new SockJS(`${WS_BASE_URL}/ws`);
@@ -191,6 +232,7 @@ const Dashboard = () => {
           destination: `/app/room/${targetRoomId}/join`,
           body: JSON.stringify({ username: currentUser })
         });
+        setActiveUsers((prev) => Array.from(new Set([...prev, currentUser])).sort());
         fetchMyRooms();
 
         // Sepet Güncellemelerini Dinle
@@ -243,6 +285,16 @@ const Dashboard = () => {
             pushNotification(`💬 ${data.sender || "Bilinmeyen"}: ${data.content}`, "chat");
           }
         });
+
+        client.subscribe(`/topic/room/${targetRoomId}/presence`, (message) => {
+          const data = JSON.parse(message.body);
+          if (!Array.isArray(data)) return;
+          const normalized = data
+            .map((user) => (user || "").trim())
+            .filter((user) => user.length > 0)
+            .sort((a, b) => a.localeCompare(b, "tr"));
+          setActiveUsers(normalized);
+        });
       },
       onStompError: (frame) => console.error("Broker error:", frame),
     });
@@ -262,6 +314,58 @@ const Dashboard = () => {
     if (!nextRoomId) return;
     setRoomId(nextRoomId);
     setSearchParams({ roomId: nextRoomId });
+  };
+
+  const syncSettingsToExtension = (silent = false) => {
+    if (!roomId) {
+      if (!silent) {
+        alert("Önce bir oda seçin veya oluşturun.");
+      }
+      return;
+    }
+
+    const authToken = localStorage.getItem("token") || "";
+    const payload = {
+      backendUrl: API_BASE_URL,
+      roomId,
+      username: currentUser,
+      authToken
+    };
+
+    let acked = false;
+    if (extensionSyncTimeoutRef.current) {
+      clearTimeout(extensionSyncTimeoutRef.current);
+    }
+
+    extensionSyncTimeoutRef.current = setTimeout(() => {
+      if (!acked) {
+        if (!silent) {
+          setExtensionSyncStatus("Eklenti cevap vermedi. Uzantiyi yukleyip sayfayi yenileyin.");
+        }
+      }
+    }, 1500);
+
+    const handleAck = (event) => {
+      if (event.source !== window) return;
+      if (event.data?.type !== "COSHOP_EXTENSION_SYNC_ACK") return;
+
+      acked = true;
+      clearTimeout(timeoutId);
+      window.removeEventListener("message", handleAck);
+
+      if (event.data?.ok) {
+        if (!silent) {
+          setExtensionSyncStatus("Ayarlar eklentiye aktarıldı.");
+        }
+      } else {
+        if (!silent) {
+          setExtensionSyncStatus(event.data?.message || "Eklentiye aktarım başarısız.");
+        }
+      }
+    };
+
+    window.addEventListener("message", handleAck);
+    window.postMessage({ type: "COSHOP_EXTENSION_SYNC", payload }, "*");
   };
 
   const copyInviteLink = () => {
@@ -397,6 +501,12 @@ const Dashboard = () => {
             <p className="text-[10px] font-bold uppercase text-gray-500">Giriş yapan</p>
             <p className="text-sm font-black text-gray-800">{currentUser}</p>
           </div>
+          <button
+            onClick={() => syncSettingsToExtension(false)}
+            className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-emerald-700 transition"
+          >
+            Eklentiye Aktar
+          </button>
           {!roomId ? (
             <button onClick={createRoom} className="bg-blue-600 text-white px-5 py-2 rounded-xl font-bold text-sm hover:bg-blue-700 transition">
               🤝 Birlikte Alışveriş Başlat
@@ -420,6 +530,12 @@ const Dashboard = () => {
           </button>
         </div>
       </nav>
+
+      {extensionSyncStatus && (
+        <div className="px-8 py-2 text-xs font-bold text-emerald-700 bg-emerald-50 border-b border-emerald-100">
+          {extensionSyncStatus}
+        </div>
+      )}
 
       <div className="border-b bg-white px-8 py-3">
         <div className="flex items-center gap-2 overflow-x-auto">
@@ -513,6 +629,23 @@ const Dashboard = () => {
             ) : (
               <p className="text-[10px] text-red-500 font-bold uppercase mt-1">○ Oda Bekleniyor</p>
             )}
+            <div className="mt-3">
+              <p className="text-[10px] font-bold uppercase text-gray-500">Odadaki Aktif Kullanıcılar</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {activeUsers.length === 0 ? (
+                  <span className="text-[11px] text-gray-400">Aktif kullanıcı yok</span>
+                ) : (
+                  activeUsers.map((user) => (
+                    <span
+                      key={user}
+                      className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700"
+                    >
+                      {user}
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
             <div className="mt-4 bg-gray-900 text-white rounded-2xl px-4 py-3 flex items-center justify-between">
               <span className="text-[10px] font-bold text-gray-300 tracking-widest">TOPLAM TUTAR</span>
               <span className="text-2xl font-black text-blue-400">{cartTotal.toFixed(2)} TL</span>

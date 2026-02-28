@@ -5,6 +5,7 @@ import com.sef.coshop.backend.model.SharedListEvent;
 import com.sef.coshop.backend.model.Product;
 import com.sef.coshop.backend.model.CartItem;
 import com.sef.coshop.backend.model.CartResponse;
+import com.sef.coshop.backend.security.JwtUtil;
 import com.sef.coshop.backend.service.SharedListEventService;
 import com.sef.coshop.backend.service.CartService;
 import com.sef.coshop.backend.service.RoomActivityService;
@@ -31,15 +32,20 @@ public class SharedListExtensionController {
     private final CartService cartService;
     private final RoomActivityService roomActivityService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final JwtUtil jwtUtil;
     @Value("${app.extension.api-key:}")
     private String extensionApiKey;
 
     @PostMapping("/add")
     public SharedListEvent add(
             @RequestHeader(value = "X-Extension-Key", required = false) String apiKey,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody SharedListAddRequest request
     ) {
-        validateApiKey(apiKey);
+        String authenticatedUsername = validateAccess(apiKey, authorization);
+        if ((request.getAddedBy() == null || request.getAddedBy().isBlank()) && authenticatedUsername != null) {
+            request.setAddedBy(authenticatedUsername);
+        }
         SharedListEvent event = sharedListEventService.addEvent(request);
         syncSharedItemToCart(event);
         return event;
@@ -48,31 +54,41 @@ public class SharedListExtensionController {
     @GetMapping("/events")
     public List<SharedListEvent> events(
             @RequestHeader(value = "X-Extension-Key", required = false) String apiKey,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestParam String roomId,
             @RequestParam(defaultValue = "0") long sinceId
     ) {
-        validateApiKey(apiKey);
+        validateAccess(apiKey, authorization);
         return sharedListEventService.getEventsAfter(roomId, sinceId);
     }
 
-    private void validateApiKey(String providedKey) {
-        if (extensionApiKey == null || extensionApiKey.isBlank()) {
-            throw new ResponseStatusException(
-                    HttpStatus.SERVICE_UNAVAILABLE,
-                    "APP_EXTENSION_API_KEY ayarlanmadigi icin extension endpointleri kapali."
+    private String validateAccess(String providedKey, String authorization) {
+        if (providedKey != null && !providedKey.isBlank()) {
+            if (extensionApiKey == null || extensionApiKey.isBlank()) {
+                throw new ResponseStatusException(
+                        HttpStatus.SERVICE_UNAVAILABLE,
+                        "APP_EXTENSION_API_KEY ayarlanmadigi icin extension endpointleri kapali."
+                );
+            }
+
+            boolean matches = MessageDigest.isEqual(
+                    extensionApiKey.getBytes(StandardCharsets.UTF_8),
+                    providedKey.getBytes(StandardCharsets.UTF_8)
             );
-        }
-        if (providedKey == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "X-Extension-Key eksik.");
+            if (!matches) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Gecersiz extension api key.");
+            }
+            return null;
         }
 
-        boolean matches = MessageDigest.isEqual(
-                extensionApiKey.getBytes(StandardCharsets.UTF_8),
-                providedKey.getBytes(StandardCharsets.UTF_8)
-        );
-        if (!matches) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Gecersiz extension api key.");
+        if (authorization != null && authorization.startsWith("Bearer ")) {
+            String token = authorization.substring(7).trim();
+            if (!token.isBlank() && jwtUtil.validateToken(token)) {
+                return jwtUtil.extractUsername(token);
+            }
         }
+
+        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Gecersiz extension yetkilendirmesi.");
     }
 
     private void syncSharedItemToCart(SharedListEvent event) {

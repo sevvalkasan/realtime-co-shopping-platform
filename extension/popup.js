@@ -2,13 +2,15 @@ const defaults = {
   backendUrl: "https://realtime-co-shopping-platform.onrender.com",
   roomId: "",
   username: "",
-  extensionApiKey: ""
+  extensionApiKey: "",
+  authToken: ""
 };
 
 const backendInput = document.getElementById("backendUrl");
 const roomInput = document.getElementById("roomId");
 const usernameInput = document.getElementById("username");
 const extensionApiKeyInput = document.getElementById("extensionApiKey");
+const authTokenInput = document.getElementById("authToken");
 const saveBtn = document.getElementById("saveBtn");
 const newRoomBtn = document.getElementById("newRoomBtn");
 const status = document.getElementById("status");
@@ -26,6 +28,7 @@ const loadSettings = () => {
     roomInput.value = data.roomId || defaults.roomId;
     usernameInput.value = data.username || "";
     extensionApiKeyInput.value = data.extensionApiKey || "";
+    authTokenInput.value = data.authToken || "";
   });
 };
 
@@ -41,7 +44,8 @@ saveBtn.addEventListener("click", () => {
     backendUrl: backendInput.value.trim() || defaults.backendUrl,
     roomId,
     username: usernameInput.value.trim(),
-    extensionApiKey: extensionApiKeyInput.value.trim()
+    extensionApiKey: extensionApiKeyInput.value.trim(),
+    authToken: authTokenInput.value.trim()
   };
 
   chrome.storage.sync.set(payload, () => {
