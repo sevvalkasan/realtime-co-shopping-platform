@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
 @RestController
@@ -27,6 +28,8 @@ public class AuthController {
     private final CodeDeliveryService codeDeliveryService;
     @Value("${app.auth.require-verification:false}")
     private boolean requireVerification;
+    @Value("${app.auth.expose-debug-codes:false}")
+    private boolean exposeDebugCodes;
 
     private String normalizeEmail(String value) {
         return value == null ? "" : value.trim().toLowerCase();
@@ -40,20 +43,18 @@ public class AuthController {
         return identifier != null && identifier.contains("@");
     }
 
-    private User findByIdentifier(String identifier) {
+    private Optional<User> findByIdentifier(String identifier) {
         String normalized = identifier == null ? "" : identifier.trim();
         if (normalized.isBlank()) {
-            throw new RuntimeException("Doğrulama hedefi boş olamaz.");
+            return Optional.empty();
         }
 
         if (normalized.contains("@")) {
-            return userRepository.findByEmail(normalized.toLowerCase())
-                    .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
+            return userRepository.findByEmail(normalized.toLowerCase());
         }
 
         return userRepository.findByPhone(normalized)
-                .or(() -> userRepository.findByUsername(normalized))
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
+                .or(() -> userRepository.findByUsername(normalized));
     }
 
     private String generateVerificationCode() {
@@ -87,7 +88,7 @@ public class AuthController {
                 .email(email)
                 .phone(phone)
                 .password(passwordEncoder.encode(password))
-                .verified(false)
+                .verified(!requireVerification)
                 .role("USER")
                 .build();
 
@@ -98,11 +99,12 @@ public class AuthController {
     @PostMapping("/send-verification")
     public ResponseEntity<?> sendVerification(@RequestBody Map<String, String> payload) {
         String identifier = payload.get("identifier") == null ? "" : payload.get("identifier").trim();
-        User user;
-        try {
-            user = findByIdentifier(identifier);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        if (identifier.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Doğrulama hedefi boş olamaz."));
+        }
+        User user = findByIdentifier(identifier).orElse(null);
+        if (user == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Kullanıcı bulunamadı!"));
         }
         boolean emailChannel = isEmailIdentifier(identifier);
         String destination = emailChannel ? user.getEmail() : user.getPhone();
@@ -118,6 +120,16 @@ public class AuthController {
             codeDeliveryService.sendVerificationCode(destination, code);
             return ResponseEntity.ok(Map.of("message", "Doğrulama kodu gönderildi."));
         } catch (Exception e) {
+            if (emailChannel && user.getVerificationCode() != null) {
+                if (exposeDebugCodes) {
+                    return ResponseEntity.ok(Map.of(
+                            "message", "Kod mail ile gönderilemedi. Geliştirme kodu döndürüldü.",
+                            "debugCode", user.getVerificationCode()
+                    ));
+                }
+                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                        .body(Map.of("message", "Kod mail ile gönderilemedi. Lütfen daha sonra tekrar deneyin."));
+            }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("message", "Kod gönderilemedi: " + e.getMessage()));
         }
@@ -127,11 +139,12 @@ public class AuthController {
     public ResponseEntity<?> verify(@RequestBody Map<String, String> payload) {
         String identifier = payload.get("identifier") == null ? "" : payload.get("identifier").trim();
         String code = payload.get("code") == null ? "" : payload.get("code").trim();
-        User user;
-        try {
-            user = findByIdentifier(identifier);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        if (identifier.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Doğrulama hedefi boş olamaz."));
+        }
+        User user = findByIdentifier(identifier).orElse(null);
+        if (user == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Kullanıcı bulunamadı!"));
         }
 
         if (user.isVerified()) {
@@ -172,11 +185,12 @@ public class AuthController {
     @PostMapping("/send-reset-code")
     public ResponseEntity<?> sendResetCode(@RequestBody Map<String, String> payload) {
         String identifier = payload.get("identifier") == null ? "" : payload.get("identifier").trim();
-        User user;
-        try {
-            user = findByIdentifier(identifier);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        if (identifier.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Doğrulama hedefi boş olamaz."));
+        }
+        User user = findByIdentifier(identifier).orElse(null);
+        if (user == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Kullanıcı bulunamadı!"));
         }
         boolean emailChannel = isEmailIdentifier(identifier);
         String destination = emailChannel ? user.getEmail() : user.getPhone();
@@ -192,6 +206,16 @@ public class AuthController {
             codeDeliveryService.sendResetCode(destination, code);
             return ResponseEntity.ok(Map.of("message", "Şifre sıfırlama kodu gönderildi."));
         } catch (Exception e) {
+            if (emailChannel && user.getResetCode() != null) {
+                if (exposeDebugCodes) {
+                    return ResponseEntity.ok(Map.of(
+                            "message", "Kod mail ile gönderilemedi. Geliştirme kodu döndürüldü.",
+                            "debugCode", user.getResetCode()
+                    ));
+                }
+                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                        .body(Map.of("message", "Kod mail ile gönderilemedi. Lütfen daha sonra tekrar deneyin."));
+            }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("message", "Kod gönderilemedi: " + e.getMessage()));
         }
@@ -207,11 +231,9 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("message", "Yeni şifre boş olamaz."));
         }
 
-        User user;
-        try {
-            user = findByIdentifier(identifier);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        User user = findByIdentifier(identifier).orElse(null);
+        if (user == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Kullanıcı bulunamadı!"));
         }
 
         if (isEmailIdentifier(identifier)) {
@@ -252,7 +274,12 @@ public class AuthController {
         String password = request.getPassword() == null ? "" : request.getPassword().trim();
 
         User user = userRepository.findByUsernameOrEmail(loginInput, loginInput.toLowerCase())
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
+                .orElse(null);
+
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Geçersiz kullanıcı adı veya şifre!"));
+        }
 
         if (requireVerification && !user.isVerified()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)

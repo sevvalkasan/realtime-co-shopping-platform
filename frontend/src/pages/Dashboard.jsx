@@ -4,6 +4,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || 'https://realtime-co-shopping-platform.onrender.com';
+const WS_BASE_URL = API_BASE_URL.replace(/\/+$/, '');
+
 const getUsernameFromToken = (token) => {
   try {
     if (!token) return null;
@@ -21,6 +25,7 @@ const Dashboard = () => {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [cartTotal, setCartTotal] = useState(0);
+  const [sharedItems, setSharedItems] = useState([]);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [notifications, setNotifications] = useState([]);
@@ -30,6 +35,7 @@ const Dashboard = () => {
   const [stompClient, setStompClient] = useState(null);
   const chatDragRef = useRef({ active: false, offsetX: 0, offsetY: 0 });
   const previousCartRef = useRef([]);
+  const sharedLastSeenRef = useRef(0);
   const cartFeedReadyRef = useRef(false);
   const notificationTimersRef = useRef(new Map());
 
@@ -49,13 +55,28 @@ const Dashboard = () => {
     if (roomId) {
       cartFeedReadyRef.current = false;
       previousCartRef.current = [];
+      sharedLastSeenRef.current = 0;
+      setSharedItems([]);
       fetchChatHistory(roomId);
+      fetchSharedList(roomId, true);
       const client = connectWebSocket(roomId);
       return () => { if (client) client.deactivate(); };
     }
     previousCartRef.current = [];
     cartFeedReadyRef.current = false;
+    sharedLastSeenRef.current = 0;
+    setSharedItems([]);
     setChatMessages([]);
+  }, [roomId]);
+
+  useEffect(() => {
+    if (!roomId) return;
+
+    const intervalId = setInterval(() => {
+      fetchSharedList(roomId, false);
+    }, 5000);
+
+    return () => clearInterval(intervalId);
   }, [roomId]);
 
   useEffect(() => {
@@ -114,23 +135,18 @@ const Dashboard = () => {
 
   const fetchProducts = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await api.get('/api/products/textile', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/api/products/textile');
       setProducts(response.data);
       setLoading(false);
     } catch (error) {
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        localStorage.clear();
-        navigate('/');
-      }
+      console.error('Ürünler alınamadı:', error.response?.data || error.message);
+      setLoading(false);
     }
   };
 
   const connectWebSocket = (targetRoomId) => {
     const token = localStorage.getItem("token");
-    const socket = new SockJS('http://localhost:8080/ws');
+    const socket = new SockJS(`${WS_BASE_URL}/ws`);
 
     const client = new Client({
       webSocketFactory: () => socket,
@@ -224,6 +240,37 @@ const Dashboard = () => {
     } catch (error) {
       console.error("Chat geçmişi alınamadı:", error.response?.data || error.message);
       setChatMessages([]);
+    }
+  };
+
+  const fetchSharedList = async (targetRoomId, initialLoad = false) => {
+    if (!targetRoomId) return;
+    try {
+      const authToken = localStorage.getItem("token");
+      const sinceId = initialLoad ? 0 : sharedLastSeenRef.current;
+      const response = await api.get(`/api/rooms/${targetRoomId}/shared-list`, {
+        params: { sinceId },
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+
+      const incoming = Array.isArray(response.data) ? response.data : [];
+      if (incoming.length === 0) return;
+
+      const maxId = incoming.reduce((max, item) => Math.max(max, Number(item?.id || 0)), sharedLastSeenRef.current);
+      sharedLastSeenRef.current = maxId;
+
+      if (!initialLoad) {
+        incoming.forEach((event) => {
+          const actor = event?.addedBy || "Bir kullanıcı";
+          const title = event?.title || "Ürün";
+          pushNotification(`🔗 ${actor} ortak listeye ekledi: ${title}`, "info");
+        });
+      }
+
+      const latestFirst = [...incoming].reverse();
+      setSharedItems((prev) => (initialLoad ? latestFirst : [...latestFirst, ...prev]).slice(0, 40));
+    } catch (error) {
+      console.error("Ortak liste alınamadı:", error.response?.data || error.message);
     }
   };
 
@@ -386,6 +433,36 @@ const Dashboard = () => {
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="border-t p-4 bg-gray-50/60">
+            <h4 className="text-sm font-black text-gray-800">🔗 Ortak Liste</h4>
+            <div className="mt-3 max-h-56 overflow-y-auto space-y-2">
+              {sharedItems.length === 0 && (
+                <p className="text-xs text-gray-400 italic">Henüz extension ürünü yok.</p>
+              )}
+              {sharedItems.map((item) => (
+                <a
+                  key={item.id}
+                  href={item.url || "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex gap-2 rounded-xl border bg-white p-2 hover:bg-blue-50 transition"
+                >
+                  {item.image ? (
+                    <img src={item.image} alt="" className="h-10 w-10 rounded-md object-cover" />
+                  ) : (
+                    <div className="h-10 w-10 rounded-md bg-gray-100" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-bold text-gray-800">{item.title || "Ürün"}</p>
+                    <p className="text-[11px] text-gray-500">
+                      {item.addedBy || "Bilinmeyen"} {item.price ? `• ${item.price}` : ""}
+                    </p>
+                  </div>
+                </a>
+              ))}
+            </div>
           </div>
 
         </aside>

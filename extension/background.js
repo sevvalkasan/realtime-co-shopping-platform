@@ -1,11 +1,16 @@
 const DEFAULTS = {
-  backendUrl: "http://localhost:8080",
+  backendUrl: "https://realtime-co-shopping-platform.onrender.com",
   roomId: "room-ortak",
   username: "",
   extensionApiKey: ""
 };
 
 const getSync = (keys) =>
+  new Promise((resolve) => {
+    chrome.storage.sync.get(keys, resolve);
+  });
+
+const getSyncRaw = (keys) =>
   new Promise((resolve) => {
     chrome.storage.sync.get(keys, resolve);
   });
@@ -68,7 +73,8 @@ const fetchEventsAndNotify = async () => {
 };
 
 chrome.runtime.onInstalled.addListener(async () => {
-  await setSync(DEFAULTS);
+  const existing = await getSyncRaw(Object.keys(DEFAULTS));
+  await setSync({ ...DEFAULTS, ...existing });
   chrome.alarms.create("coshopPoll", { periodInMinutes: 1 });
   fetchEventsAndNotify();
 });
