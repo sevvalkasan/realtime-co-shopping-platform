@@ -34,15 +34,36 @@ public class CartItem {
 
     public void decrease(String user) {
         user = normalize(user);
-        if (!userQuantities.containsKey(user)) return;
+        if (this.quantity <= 0) return;
 
         this.quantity--;
-        int newQty = userQuantities.get(user) - 1;
 
+        if (userQuantities.containsKey(user)) {
+            int newQty = userQuantities.get(user) - 1;
+            if (newQty <= 0) {
+                userQuantities.remove(user);
+            } else {
+                userQuantities.put(user, newQty);
+            }
+            return;
+        }
+
+        // Farklı bir kullanıcı da sepetten eksiltebilsin:
+        // hedef kullanıcıya ait kayıt yoksa mevcut sahiplerden birinden düş.
+        String fallbackOwner = userQuantities.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(null);
+
+        if (fallbackOwner == null) {
+            return;
+        }
+
+        int newQty = userQuantities.getOrDefault(fallbackOwner, 0) - 1;
         if (newQty <= 0) {
-            userQuantities.remove(user);
+            userQuantities.remove(fallbackOwner);
         } else {
-            userQuantities.put(user, newQty);
+            userQuantities.put(fallbackOwner, newQty);
         }
     }
 
