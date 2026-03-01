@@ -124,7 +124,7 @@ const joinRoomOnBackend = async (roomId) => {
   const response = await fetch(`${state.backendUrl}/api/rooms/join`, {
     method: "POST",
     headers: getHeaders(true),
-    body: JSON.stringify({ roomId })
+    body: JSON.stringify({ roomId, username: state.username || "" })
   });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
