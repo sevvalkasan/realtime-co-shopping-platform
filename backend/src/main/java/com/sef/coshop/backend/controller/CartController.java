@@ -7,6 +7,7 @@ import com.sef.coshop.backend.model.Product;
 import com.sef.coshop.backend.service.CartService;
 import com.sef.coshop.backend.service.ProductService;
 import com.sef.coshop.backend.service.RoomActivityService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/rooms/{roomId}/cart")
@@ -38,8 +39,12 @@ public class CartController {
     }
 
     @GetMapping
-    public List<CartItem> getCart(@PathVariable String roomId) {
-        roomActivityService.recordActivity(roomId, null);
-        return cartService.getCart(roomId);
+    public ResponseEntity<?> getCart(@PathVariable String roomId) {
+        try {
+            roomActivityService.recordActivity(roomId, null);
+            return ResponseEntity.ok(cartService.getCart(roomId));
+        } catch (Exception ex) {
+            return ResponseEntity.ok(List.of());
+        }
     }
 }

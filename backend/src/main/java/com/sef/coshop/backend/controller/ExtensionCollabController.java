@@ -41,8 +41,12 @@ public class ExtensionCollabController {
             @RequestHeader(value = "X-Extension-Key", required = false) String apiKey,
             @RequestHeader(value = "Authorization", required = false) String authorization
     ) {
-        validateAccess(apiKey, authorization);
-        return chatMessageRepository.findByRoomIdOrderByTimestampAsc(roomId);
+        try {
+            validateAccess(apiKey, authorization);
+            return chatMessageRepository.findByRoomIdOrderByTimestampAsc(roomId);
+        } catch (Exception ex) {
+            return List.of();
+        }
     }
 
     @PostMapping("/chat/{roomId}")
@@ -52,27 +56,34 @@ public class ExtensionCollabController {
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody Map<String, String> payload
     ) {
-        String content = payload.getOrDefault("content", "").trim();
-        if (content.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Mesaj boş olamaz."));
+        try {
+            String content = payload.getOrDefault("content", "").trim();
+            if (content.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Mesaj boş olamaz."));
+            }
+
+            String username = validateAccess(apiKey, authorization);
+            String sender = (username != null && !username.isBlank())
+                    ? username
+                    : payload.getOrDefault("sender", "anonim");
+
+            ChatMessage message = new ChatMessage();
+            message.setRoomId(roomId);
+            message.setSender(sender);
+            message.setContent(content);
+            message.setTimestamp(LocalDateTime.now());
+            message.setType("MESSAGE");
+
+            chatMessageRepository.save(message);
+            messagingTemplate.convertAndSend("/topic/room/" + roomId + "/chat", message);
+            roomActivityService.recordActivity(roomId, sender);
+            return ResponseEntity.ok(message);
+        } catch (ResponseStatusException ex) {
+            return ResponseEntity.status(ex.getStatusCode())
+                    .body(Map.of("message", ex.getReason() == null ? "Mesaj gonderilemedi." : ex.getReason()));
+        } catch (Exception ex) {
+            return ResponseEntity.internalServerError().body(Map.of("message", "Mesaj gonderilemedi."));
         }
-
-        String username = validateAccess(apiKey, authorization);
-        String sender = (username != null && !username.isBlank())
-                ? username
-                : payload.getOrDefault("sender", "anonim");
-
-        ChatMessage message = new ChatMessage();
-        message.setRoomId(roomId);
-        message.setSender(sender);
-        message.setContent(content);
-        message.setTimestamp(LocalDateTime.now());
-        message.setType("MESSAGE");
-
-        chatMessageRepository.save(message);
-        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/chat", message);
-        roomActivityService.recordActivity(roomId, sender);
-        return ResponseEntity.ok(message);
     }
 
     @PostMapping("/cart/{roomId}/decrease")
@@ -82,27 +93,34 @@ public class ExtensionCollabController {
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody Map<String, Object> payload
     ) {
-        String username = validateAccess(apiKey, authorization);
-        String fallbackUser = payload.getOrDefault("user", "anonim").toString().trim();
-        String user = (username != null && !username.isBlank()) ? username : fallbackUser;
-
-        Long productId;
         try {
-            Object productIdRaw = payload.get("productId");
-            if (productIdRaw == null) {
-                return ResponseEntity.badRequest().body(Map.of("message", "productId zorunlu"));
-            }
-            productId = Long.parseLong(productIdRaw.toString());
-        } catch (NumberFormatException ex) {
-            return ResponseEntity.badRequest().body(Map.of("message", "productId gecersiz"));
-        }
+            String username = validateAccess(apiKey, authorization);
+            String fallbackUser = payload.getOrDefault("user", "anonim").toString().trim();
+            String user = (username != null && !username.isBlank()) ? username : fallbackUser;
 
-        List<CartItem> updatedCart = cartService.decreaseItem(roomId, productId, user);
-        double total = cartService.calculateTotal(roomId);
-        roomActivityService.recordActivity(roomId, user);
-        CartResponse response = new CartResponse(updatedCart, total);
-        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/cart", response);
-        return ResponseEntity.ok(response);
+            Long productId;
+            try {
+                Object productIdRaw = payload.get("productId");
+                if (productIdRaw == null) {
+                    return ResponseEntity.badRequest().body(Map.of("message", "productId zorunlu"));
+                }
+                productId = Long.parseLong(productIdRaw.toString());
+            } catch (NumberFormatException ex) {
+                return ResponseEntity.badRequest().body(Map.of("message", "productId gecersiz"));
+            }
+
+            List<CartItem> updatedCart = cartService.decreaseItem(roomId, productId, user);
+            double total = cartService.calculateTotal(roomId);
+            roomActivityService.recordActivity(roomId, user);
+            CartResponse response = new CartResponse(updatedCart, total);
+            messagingTemplate.convertAndSend("/topic/room/" + roomId + "/cart", response);
+            return ResponseEntity.ok(response);
+        } catch (ResponseStatusException ex) {
+            return ResponseEntity.status(ex.getStatusCode())
+                    .body(Map.of("message", ex.getReason() == null ? "Eksiltme basarisiz." : ex.getReason()));
+        } catch (Exception ex) {
+            return ResponseEntity.internalServerError().body(Map.of("message", "Eksiltme basarisiz."));
+        }
     }
 
     private String validateAccess(String providedKey, String authorization) {
@@ -134,4 +152,3 @@ public class ExtensionCollabController {
         throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Gecersiz extension yetkilendirmesi.");
     }
 }
-
