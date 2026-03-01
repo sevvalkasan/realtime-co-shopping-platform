@@ -125,6 +125,13 @@ const Dashboard = () => {
   }, [roomId]);
 
   useEffect(() => {
+    if (!roomId) return;
+    fetchPresence(roomId);
+    const intervalId = setInterval(() => fetchPresence(roomId), 4000);
+    return () => clearInterval(intervalId);
+  }, [roomId]);
+
+  useEffect(() => {
     return () => {
       notificationTimersRef.current.forEach((timerId) => clearTimeout(timerId));
       notificationTimersRef.current.clear();
@@ -213,6 +220,26 @@ const Dashboard = () => {
     } catch (error) {
       setCart([]);
       setCartTotal(0);
+    }
+  };
+
+  const fetchPresence = async (targetRoomId) => {
+    if (!targetRoomId) return;
+    try {
+      const response = await api.get(`/api/rooms/${targetRoomId}/presence`);
+      let users = [];
+      if (Array.isArray(response.data)) {
+        users = response.data;
+      } else if (response.data && typeof response.data === "object") {
+        users = Object.values(response.data);
+      }
+      const normalized = users
+        .map((user) => (user || "").trim())
+        .filter((user) => user.length > 0)
+        .sort((a, b) => a.localeCompare(b, "tr"));
+      setActiveUsers(normalized);
+    } catch (_) {
+      // websocket/presence fallback sessiz
     }
   };
 
@@ -350,7 +377,10 @@ const Dashboard = () => {
       if (event.data?.type !== "COSHOP_EXTENSION_SYNC_ACK") return;
 
       acked = true;
-      clearTimeout(timeoutId);
+      if (extensionSyncTimeoutRef.current) {
+        clearTimeout(extensionSyncTimeoutRef.current);
+        extensionSyncTimeoutRef.current = null;
+      }
       window.removeEventListener("message", handleAck);
 
       if (event.data?.ok) {

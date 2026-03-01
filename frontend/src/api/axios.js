@@ -1,7 +1,10 @@
 import axios from 'axios';
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || 'https://realtime-co-shopping-platform.onrender.com';
+
 const api = axios.create({
-    baseURL: 'http://localhost:8080', // Java backend portun
+    baseURL: API_BASE_URL,
 });
 
 // Interceptor: Her isteğe (request) gitmeden önce bak ve varsa Token'ı ekle

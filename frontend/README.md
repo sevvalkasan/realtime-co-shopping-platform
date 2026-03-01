@@ -1,8 +1,20 @@
-# React + Vite
+# Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Bu uygulama backend adresini `VITE_API_BASE_URL` degiskeninden okur.
 
-Currently, two official plugins are available:
+## Calistirma
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+npm install
+npm run dev
+```
+
+## Ortam Degiskeni
+
+`.env.example` dosyasini `.env` olarak kopyalayip gerekirse backend URL'yi degistir:
+
+```env
+VITE_API_BASE_URL=https://realtime-co-shopping-platform.onrender.com
+```
+
+Bu ayar hem REST API hem WebSocket (`/ws`) baglantisinda kullanilir.

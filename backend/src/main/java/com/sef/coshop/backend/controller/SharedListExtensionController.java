@@ -63,6 +63,13 @@ public class SharedListExtensionController {
     }
 
     private String validateAccess(String providedKey, String authorization) {
+        if (authorization != null && authorization.startsWith("Bearer ")) {
+            String token = authorization.substring(7).trim();
+            if (!token.isBlank() && jwtUtil.validateToken(token)) {
+                return jwtUtil.extractUsername(token);
+            }
+        }
+
         if (providedKey != null && !providedKey.isBlank()) {
             if (extensionApiKey == null || extensionApiKey.isBlank()) {
                 throw new ResponseStatusException(
@@ -79,13 +86,6 @@ public class SharedListExtensionController {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Gecersiz extension api key.");
             }
             return null;
-        }
-
-        if (authorization != null && authorization.startsWith("Bearer ")) {
-            String token = authorization.substring(7).trim();
-            if (!token.isBlank() && jwtUtil.validateToken(token)) {
-                return jwtUtil.extractUsername(token);
-            }
         }
 
         throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Gecersiz extension yetkilendirmesi.");

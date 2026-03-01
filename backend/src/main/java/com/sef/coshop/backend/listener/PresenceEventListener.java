@@ -37,7 +37,7 @@ public class PresenceEventListener {
             Set<String> users = presenceService.getUsers(roomId);
 
             messagingTemplate.convertAndSend(
-                    "/topic/room/" + roomId,
+                    "/topic/room/" + roomId + "/presence",
                     users
             );
 

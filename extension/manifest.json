@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Coshop Trendyol Bridge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Trendyol urunlerini ortak listeye ekler ve arkadaslariniza bildirim gonderir.",
   "permissions": ["storage", "notifications", "alarms"],
   "host_permissions": [

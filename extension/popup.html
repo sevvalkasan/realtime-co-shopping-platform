@@ -3,44 +3,98 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Coshop Ayarlar</title>
+  <title>Coshop Eklenti</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 14px; width: 320px; background: #f3f4f6; }
-    .card { background: #fff; border-radius: 10px; padding: 12px; border: 1px solid #e5e7eb; }
-    h1 { margin: 0 0 10px; font-size: 14px; }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 12px; width: 340px; background: #f3f4f6; color: #111827; }
+    .card { background: #fff; border-radius: 10px; padding: 12px; border: 1px solid #e5e7eb; margin-bottom: 10px; }
+    h1 { margin: 0 0 8px; font-size: 15px; }
+    h2 { margin: 0 0 8px; font-size: 13px; }
     label { display: block; font-size: 12px; font-weight: 700; margin: 8px 0 4px; }
-    input { width: 100%; box-sizing: border-box; padding: 8px; border-radius: 8px; border: 1px solid #d1d5db; }
-    button { margin-top: 12px; width: 100%; padding: 9px; border: 0; border-radius: 8px; background: #111827; color: #fff; font-weight: 700; cursor: pointer; }
+    input, select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      font-size: 12px;
+      background: #fff;
+    }
+    button {
+      margin-top: 10px;
+      width: 100%;
+      padding: 9px;
+      border: 0;
+      border-radius: 8px;
+      background: #111827;
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .secondary { background: #2563eb; }
+    .ghost { background: #e5e7eb; color: #111827; }
+    .danger { background: #dc2626; }
     .row { display: flex; gap: 8px; }
-    .row button { margin-top: 0; width: auto; flex: 1; }
-    .status { margin-top: 8px; font-size: 11px; color: #166534; min-height: 14px; }
+    .row button { margin-top: 8px; }
+    .muted { font-size: 11px; color: #6b7280; margin-top: 6px; }
+    .status { margin-top: 8px; font-size: 11px; min-height: 14px; }
+    .hidden { display: none; }
+    .user-badge { font-size: 12px; font-weight: 700; color: #1d4ed8; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>Coshop Eklenti Ayarlari</h1>
-
+    <h1>Coshop Eklenti v2</h1>
     <label for="backendUrl">Backend URL</label>
     <input id="backendUrl" placeholder="https://realtime-co-shopping-platform.onrender.com" />
+    <label for="frontendUrl">Frontend URL (Davet Linki)</label>
+    <input id="frontendUrl" placeholder="http://localhost:5173" />
+  </div>
 
-    <label for="roomId">Oda ID</label>
-    <input id="roomId" placeholder="room-ab12cd34" />
-    <div class="row" style="margin-top: 8px;">
-      <button id="newRoomBtn" type="button">Yeni Oda ID Uret</button>
+  <div class="card" id="loginCard">
+    <h2>Giriş Yap</h2>
+    <label for="loginIdentifier">Kullanıcı adı veya e-posta</label>
+    <input id="loginIdentifier" placeholder="sevval veya mail@ornek.com" />
+
+    <label for="loginPassword">Şifre</label>
+    <input id="loginPassword" type="password" placeholder="••••••••" />
+
+    <button id="loginBtn" class="secondary">Giriş Yap</button>
+    <div class="muted">Bir kere giriş yaptıktan sonra oda seçip direkt kullanırsın.</div>
+  </div>
+
+  <div class="card hidden" id="sessionCard">
+    <h2>Oturum</h2>
+    <div class="user-badge" id="sessionUser">-</div>
+    <div class="muted" id="sessionBackend">-</div>
+    <button id="logoutBtn" class="danger">Çıkış Yap</button>
+  </div>
+
+  <div class="card hidden" id="roomCard">
+    <h2>Oda Yönetimi</h2>
+
+    <label for="roomSelect">Katıldığım Odalar</label>
+    <select id="roomSelect">
+      <option value="">(Oda seç)</option>
+    </select>
+    <div class="row">
+      <button id="useSelectedRoomBtn" class="secondary">Seçili Odayı Kullan</button>
+      <button id="refreshRoomsBtn" class="ghost">Yenile</button>
     </div>
 
-    <label for="username">Kullanici Adi</label>
-    <input id="username" placeholder="sevval" />
+    <label for="joinRoomInput">Davet Linki veya Oda ID</label>
+    <input id="joinRoomInput" placeholder="room-abc12345 veya ...?roomId=room-abc12345" />
+    <button id="joinRoomBtn">Odaya Katıl</button>
 
-    <label for="authToken">Auth Token (Opsiyonel)</label>
-    <input id="authToken" placeholder="Dashboarddan otomatik gelebilir" />
+    <div class="row">
+      <button id="createRoomBtn" class="secondary">Yeni Oda Oluştur</button>
+      <button id="copyInviteBtn" class="ghost">Davet Linki Kopyala</button>
+    </div>
 
-    <label for="extensionApiKey">Extension API Key</label>
-    <input id="extensionApiKey" placeholder="APP_EXTENSION_API_KEY degeri" />
-
-    <button id="saveBtn">Kaydet</button>
-    <div class="status" id="status"></div>
+    <div class="muted">Seçili oda: <span id="activeRoom">-</span></div>
   </div>
+
+  <div class="status" id="status"></div>
 
   <script src="popup.js"></script>
 </body>
