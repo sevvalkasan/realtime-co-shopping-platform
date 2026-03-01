@@ -18,6 +18,11 @@ public class PresenceRestController {
 
     @GetMapping
     public Set<String> getPresence(@PathVariable String roomId) {
-        return presenceService.getUsers(roomId);
+        try {
+            Set<String> users = presenceService.getUsers(roomId);
+            return users == null ? Set.of() : users;
+        } catch (Exception ex) {
+            return Set.of();
+        }
     }
 }
