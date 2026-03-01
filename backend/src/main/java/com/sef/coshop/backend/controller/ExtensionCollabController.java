@@ -3,10 +3,12 @@ package com.sef.coshop.backend.controller;
 import com.sef.coshop.backend.model.CartItem;
 import com.sef.coshop.backend.model.CartResponse;
 import com.sef.coshop.backend.model.ChatMessage;
+import com.sef.coshop.backend.model.SharedListEvent;
 import com.sef.coshop.backend.repository.ChatMessageRepository;
 import com.sef.coshop.backend.security.JwtUtil;
 import com.sef.coshop.backend.service.CartService;
 import com.sef.coshop.backend.service.RoomActivityService;
+import com.sef.coshop.backend.service.SharedListEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -31,6 +33,7 @@ public class ExtensionCollabController {
     private final SimpMessagingTemplate messagingTemplate;
     private final CartService cartService;
     private final RoomActivityService roomActivityService;
+    private final SharedListEventService sharedListEventService;
 
     @Value("${app.extension.api-key:}")
     private String extensionApiKey;
@@ -41,12 +44,48 @@ public class ExtensionCollabController {
             @RequestHeader(value = "X-Extension-Key", required = false) String apiKey,
             @RequestHeader(value = "Authorization", required = false) String authorization
     ) {
-        try {
-            validateAccess(apiKey, authorization);
-            return chatMessageRepository.findByRoomIdOrderByTimestampAsc(roomId);
-        } catch (Exception ex) {
-            return List.of();
+        validateAccess(apiKey, authorization);
+        return chatMessageRepository.findByRoomIdOrderByTimestampAsc(roomId);
+    }
+
+    @GetMapping("/cart/{roomId}")
+    public List<CartItem> getCart(
+            @PathVariable String roomId,
+            @RequestHeader(value = "X-Extension-Key", required = false) String apiKey,
+            @RequestHeader(value = "Authorization", required = false) String authorization
+    ) {
+        validateAccess(apiKey, authorization);
+        roomActivityService.recordActivity(roomId, null);
+        return cartService.getCart(roomId);
+    }
+
+    @GetMapping("/shared-list/{roomId}")
+    public List<SharedListEvent> getSharedList(
+            @PathVariable String roomId,
+            @RequestParam(defaultValue = "0") long sinceId,
+            @RequestHeader(value = "X-Extension-Key", required = false) String apiKey,
+            @RequestHeader(value = "Authorization", required = false) String authorization
+    ) {
+        validateAccess(apiKey, authorization);
+        return sharedListEventService.getEventsAfter(roomId, sinceId);
+    }
+
+    @PostMapping("/rooms/join")
+    public Map<String, String> joinRoom(
+            @RequestBody Map<String, String> payload,
+            @RequestHeader(value = "X-Extension-Key", required = false) String apiKey,
+            @RequestHeader(value = "Authorization", required = false) String authorization
+    ) {
+        String username = validateAccess(apiKey, authorization);
+        if (username == null || username.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Username belirlenemedi.");
         }
+        String roomId = payload.getOrDefault("roomId", "").trim();
+        if (roomId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "roomId zorunlu");
+        }
+        roomActivityService.joinRoom(roomId, username);
+        return Map.of("roomId", roomId, "username", username, "message", "Katilim basarili");
     }
 
     @PostMapping("/chat/{roomId}")

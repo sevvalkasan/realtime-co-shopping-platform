@@ -50,12 +50,8 @@ public class RoomController {
             @RequestHeader(value = "Authorization", required = false) String authorization
     ) {
         String username = resolveUsername(authentication, apiKey, authorization);
-        String fallbackUsername = payload.getOrDefault("username", "").trim();
-        if ((username == null || username.isBlank()) && !fallbackUsername.isBlank()) {
-            username = fallbackUsername;
-        }
         if (username == null || username.isBlank()) {
-            username = "extension-user";
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Gecersiz yetkilendirme.");
         }
         String roomId = payload.getOrDefault("roomId", "").trim();
         if (roomId.isBlank()) {

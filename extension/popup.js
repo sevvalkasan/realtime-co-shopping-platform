@@ -121,10 +121,10 @@ const renderRooms = () => {
 };
 
 const joinRoomOnBackend = async (roomId) => {
-  const response = await fetch(`${state.backendUrl}/api/rooms/join`, {
+  const response = await fetch(`${state.backendUrl}/api/extension/rooms/join`, {
     method: "POST",
     headers: getHeaders(true),
-    body: JSON.stringify({ roomId, username: state.username || "" })
+    body: JSON.stringify({ roomId })
   });
   if (!response.ok) {
     const text = await response.text().catch(() => "");

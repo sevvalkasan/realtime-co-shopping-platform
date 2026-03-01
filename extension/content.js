@@ -489,7 +489,7 @@
 
     try {
       const response = await fetch(
-        `${settings.backendUrl}/api/rooms/${encodeURIComponent(roomId)}/shared-list?sinceId=0`,
+        `${settings.backendUrl}/api/extension/shared-list/${encodeURIComponent(roomId)}?sinceId=0`,
         { headers: getAuthHeaders(settings) }
       );
       if (!response.ok) return;
@@ -652,10 +652,10 @@
 
     try {
       const [cartResponse, sharedResponse] = await Promise.all([
-        fetch(`${settings.backendUrl}/api/rooms/${encodeURIComponent(roomId)}/cart`, {
+        fetch(`${settings.backendUrl}/api/extension/cart/${encodeURIComponent(roomId)}`, {
           headers: getAuthHeaders(settings)
         }),
-        fetch(`${settings.backendUrl}/api/rooms/${encodeURIComponent(roomId)}/shared-list?sinceId=0`, {
+        fetch(`${settings.backendUrl}/api/extension/shared-list/${encodeURIComponent(roomId)}?sinceId=0`, {
           headers: getAuthHeaders(settings)
         })
       ]);
@@ -731,7 +731,7 @@
     try {
       await refreshSharedUrlMap(settings, roomId, false);
       const response = await fetch(
-        `${settings.backendUrl}/api/rooms/${encodeURIComponent(roomId)}/cart`,
+        `${settings.backendUrl}/api/extension/cart/${encodeURIComponent(roomId)}`,
         { headers: getAuthHeaders(settings, false) }
       );
 
